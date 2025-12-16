@@ -77,6 +77,6 @@ app.post('/api/check', upload.single('image'), async (req, res) => {
 });
 
 // Health Check
-app.get('/', (req, res) => res.send("✅ Box API is Online (Node 18 Mode)"));
+app.get('/', (req, res) => res.send("✅ API is Online"));
 
 module.exports = app;
