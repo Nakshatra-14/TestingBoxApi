@@ -2,15 +2,26 @@ const express = require('express');
 const multer = require('multer');
 const { Canvas, Image, loadImage } = require('canvas');
 
-// --- 1. POLYFILL THE BROWSER ENVIRONMENT ---
-// We must do this BEFORE loading TensorFlow/TeachableMachine
-// or they will crash looking for "window" or "HTMLCanvasElement".
+// --- 1. SUPER POLYFILL (The Fix) ---
+// We trick the library into thinking it's in a browser
 global.window = global;
 global.HTMLCanvasElement = Canvas;
 global.HTMLImageElement = Image;
-global.HTMLVideoElement = Object; // Dummy object to prevent crash
+global.HTMLVideoElement = Object;
 
-// --- 2. LOAD LIBRARIES ---
+// The error happened because we missed this part:
+global.document = {
+    createElement: (tag) => {
+        if (tag === 'canvas') return new Canvas(224, 224); // Give it a fake canvas
+        if (tag === 'img') return new Image();
+        return {};
+    },
+    // Sometimes it asks for body to append things
+    body: { appendChild: () => {} }
+};
+// -----------------------------------
+
+// --- 2. LOAD LIBRARIES (Must be AFTER polyfills) ---
 const tf = require('@tensorflow/tfjs');
 const tmImage = require('@teachablemachine/image');
 
@@ -28,7 +39,7 @@ async function loadModel() {
     const modelURL = URL + "model.json";
     const metadataURL = URL + "metadata.json";
     
-    // tmImage.load usually runs in browser. In Node, it needs help.
+    // Using the mock environment to load
     model = await tmImage.load(modelURL, metadataURL);
     return model;
 }
@@ -44,7 +55,7 @@ app.post('/api/check', upload.single('image'), async (req, res) => {
         // Convert Buffer to Image
         const image = await loadImage(req.file.buffer);
 
-        // Create a Canvas (The AI needs a canvas, not a raw image)
+        // Create a Canvas for the AI
         const canvas = new Canvas(image.width, image.height);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(image, 0, 0);
